@@ -1130,6 +1130,11 @@ export interface ResolvedCommand extends RegisteredCommand {
 // biome-ignore lint/suspicious/noConfusingVoidType: void allows bare return statements
 export type ExtensionHandler<E, R = undefined> = (event: E, ctx: ExtensionContext) => Promise<R | void> | R | void;
 
+export interface ModelSelectionOptions {
+	/** Persist the selection as the new default in settings.json. Defaults to true. */
+	persist?: boolean;
+}
+
 /**
  * ExtensionAPI passed to extension factory functions.
  */
@@ -1279,13 +1284,13 @@ export interface ExtensionAPI {
 	// =========================================================================
 
 	/** Set the current model. Returns false if no API key available. */
-	setModel(model: Model<any>): Promise<boolean>;
+	setModel(model: Model<any>, options?: ModelSelectionOptions): Promise<boolean>;
 
 	/** Get current thinking level. */
 	getThinkingLevel(): ThinkingLevel;
 
 	/** Set thinking level (clamped to model capabilities). */
-	setThinkingLevel(level: ThinkingLevel): void;
+	setThinkingLevel(level: ThinkingLevel, options?: ModelSelectionOptions): void;
 
 	// =========================================================================
 	// Provider Registration
@@ -1489,11 +1494,11 @@ export type SetActiveToolsHandler = (toolNames: string[]) => void;
 
 export type RefreshToolsHandler = () => void;
 
-export type SetModelHandler = (model: Model<any>) => Promise<boolean>;
+export type SetModelHandler = (model: Model<any>, options?: ModelSelectionOptions) => Promise<boolean>;
 
 export type GetThinkingLevelHandler = () => ThinkingLevel;
 
-export type SetThinkingLevelHandler = (level: ThinkingLevel) => void;
+export type SetThinkingLevelHandler = (level: ThinkingLevel, options?: ModelSelectionOptions) => void;
 
 export type SetLabelHandler = (entryId: string, label: string | undefined) => void;
 

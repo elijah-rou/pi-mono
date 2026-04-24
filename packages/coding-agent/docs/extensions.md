@@ -1592,27 +1592,31 @@ Typical `sourceInfo.source` values:
 - `sdk` for tools passed via `createAgentSession({ customTools })`
 - extension source metadata for tools registered by extensions
 
-### pi.setModel(model)
+### pi.setModel(model, options?)
 
 Set the current model. Returns `false` if no API key is available for the model. See [models.md](models.md) for configuring custom models.
+
+By default, the model is saved as the new default in `settings.json`. Use `{ persist: false }` for per-session routing or temporary model switches that should not change defaults.
 
 ```typescript
 const model = ctx.modelRegistry.find("anthropic", "claude-sonnet-4-5");
 if (model) {
-  const success = await pi.setModel(model);
+  const success = await pi.setModel(model, { persist: false });
   if (!success) {
     ctx.ui.notify("No API key for this model", "error");
   }
 }
 ```
 
-### pi.getThinkingLevel() / pi.setThinkingLevel(level)
+### pi.getThinkingLevel() / pi.setThinkingLevel(level, options?)
 
 Get or set the thinking level. Level is clamped to model capabilities (non-reasoning models always use "off"). Changes emit `thinking_level_select`.
 
+By default, the thinking level is saved as the new default in `settings.json`. Use `{ persist: false }` for per-session routing or temporary thinking-level switches.
+
 ```typescript
 const current = pi.getThinkingLevel();  // "off" | "minimal" | "low" | "medium" | "high" | "xhigh"
-pi.setThinkingLevel("high");
+pi.setThinkingLevel("high", { persist: false });
 ```
 
 ### pi.events

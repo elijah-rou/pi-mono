@@ -35,6 +35,8 @@ describe("AgentSession model and extension characterization", () => {
 		await harness.session.setModel(nextModel);
 
 		expect(harness.session.model?.id).toBe("faux-2");
+		expect(harness.settingsManager.getDefaultProvider()).toBe(nextModel.provider);
+		expect(harness.settingsManager.getDefaultModel()).toBe(nextModel.id);
 		expect(modelEvents).toEqual(["faux-1->faux-2:set"]);
 		expect(
 			harness.sessionManager
@@ -42,6 +44,45 @@ describe("AgentSession model and extension characterization", () => {
 				.filter((entry) => entry.type === "model_change")
 				.map((entry) => `${entry.provider}/${entry.modelId}`),
 		).toEqual([`${nextModel.provider}/${nextModel.id}`]);
+	});
+
+	it("allows runtime model and thinking switches without persisting defaults", async () => {
+		let extensionApi: ExtensionAPI | undefined;
+		const harness = await createHarness({
+			models: [
+				{ id: "faux-1", name: "One", reasoning: true },
+				{ id: "faux-2", name: "Two", reasoning: true },
+			],
+			extensionFactories: [
+				(pi) => {
+					extensionApi = pi;
+				},
+			],
+		});
+		harnesses.push(harness);
+		const nextModel = harness.getModel("faux-2")!;
+
+		const switched = await extensionApi!.setModel(nextModel, { persist: false });
+		extensionApi!.setThinkingLevel("high", { persist: false });
+
+		expect(switched).toBe(true);
+		expect(harness.session.model?.id).toBe("faux-2");
+		expect(harness.session.thinkingLevel).toBe("high");
+		expect(harness.settingsManager.getDefaultProvider()).toBeUndefined();
+		expect(harness.settingsManager.getDefaultModel()).toBeUndefined();
+		expect(harness.settingsManager.getDefaultThinkingLevel()).toBeUndefined();
+		expect(
+			harness.sessionManager
+				.getEntries()
+				.filter((entry) => entry.type === "model_change")
+				.map((entry) => `${entry.provider}/${entry.modelId}`),
+		).toEqual([`${nextModel.provider}/${nextModel.id}`]);
+		expect(
+			harness.sessionManager
+				.getEntries()
+				.filter((entry) => entry.type === "thinking_level_change")
+				.map((entry) => entry.thinkingLevel),
+		).toEqual(["high"]);
 	});
 
 	it("cycles through scoped models and preserves the scoped thinking preference", async () => {

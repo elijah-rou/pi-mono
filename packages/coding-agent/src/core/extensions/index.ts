@@ -96,6 +96,7 @@ export type {
 	MessageStartEvent,
 	MessageUpdateEvent,
 	ModelSelectEvent,
+	ModelSelectionOptions,
 	ModelSelectSource,
 	// Provider Registration
 	ProviderConfig,

@@ -3,7 +3,7 @@ import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import type { Model } from "@earendil-works/pi-ai";
 import { getAgentDir } from "../config.ts";
 import { AuthStorage } from "./auth-storage.ts";
-import type { SessionStartEvent, ToolDefinition } from "./extensions/index.ts";
+import type { InvocationKind, SessionStartEvent, ToolDefinition } from "./extensions/index.ts";
 import { ModelRegistry } from "./model-registry.ts";
 import { DefaultResourceLoader, type DefaultResourceLoaderOptions, type ResourceLoader } from "./resource-loader.ts";
 import { type CreateAgentSessionOptions, type CreateAgentSessionResult, createAgentSession } from "./sdk.ts";
@@ -55,6 +55,10 @@ export interface CreateAgentSessionFromServicesOptions {
 	tools?: string[];
 	noTools?: CreateAgentSessionOptions["noTools"];
 	customTools?: ToolDefinition[];
+	invocationKind?: InvocationKind;
+	agentIdentity?: string | null;
+	explicitToolsSet?: boolean;
+	explicitModelSet?: boolean;
 }
 
 /**
@@ -194,5 +198,9 @@ export async function createAgentSessionFromServices(
 		noTools: options.noTools,
 		customTools: options.customTools,
 		sessionStartEvent: options.sessionStartEvent,
+		invocationKind: options.invocationKind,
+		agentIdentity: options.agentIdentity,
+		explicitToolsSet: options.explicitToolsSet,
+		explicitModelSet: options.explicitModelSet,
 	});
 }

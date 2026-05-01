@@ -302,6 +302,14 @@ export interface ExtensionContext {
 	hasUI: boolean;
 	/** Current working directory */
 	cwd: string;
+	/** How this pi runtime was invoked. */
+	invocationKind?: InvocationKind;
+	/** Subagent/SDK identity for non-interactive invocations, if provided. */
+	agentIdentity?: string | null;
+	/** Whether --tools was passed on the CLI. */
+	explicitToolsSet?: boolean;
+	/** Whether --model was passed on the CLI. */
+	explicitModelSet?: boolean;
 	/** Session manager (read-only) */
 	sessionManager: ReadonlySessionManager;
 	/** Model registry for API key resolution */
@@ -745,7 +753,10 @@ export interface UserBashEvent {
 // ============================================================================
 
 /** Source of user input */
-export type InputSource = "interactive" | "rpc" | "extension";
+export type InputSource = "interactive" | "print" | "rpc" | "extension" | "subagent" | "sdk";
+
+/** How the current runtime was invoked. */
+export type InvocationKind = "interactive" | "print" | "subagent" | "rpc" | "sdk";
 
 /** Fired when user input is received, before agent processing */
 export interface InputEvent {

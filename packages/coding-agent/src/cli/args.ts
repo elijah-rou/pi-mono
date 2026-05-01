@@ -5,9 +5,10 @@
 import type { ThinkingLevel } from "@earendil-works/pi-agent-core";
 import chalk from "chalk";
 import { APP_NAME, CONFIG_DIR_NAME, ENV_AGENT_DIR, ENV_SESSION_DIR } from "../config.ts";
-import type { ExtensionFlag } from "../core/extensions/types.ts";
+import type { ExtensionFlag, InvocationKind } from "../core/extensions/types.ts";
 
 export type Mode = "text" | "json" | "rpc";
+export type CliSource = InvocationKind;
 
 export interface Args {
 	provider?: string;
@@ -22,6 +23,9 @@ export interface Args {
 	version?: boolean;
 	mode?: Mode;
 	name?: string;
+	source?: CliSource;
+	agentIdentity?: string;
+	disableRouter?: boolean;
 	noSession?: boolean;
 	session?: string;
 	sessionId?: string;
@@ -55,6 +59,11 @@ export interface Args {
 }
 
 const VALID_THINKING_LEVELS = ["off", "minimal", "low", "medium", "high", "xhigh"] as const;
+const VALID_SOURCES = ["interactive", "print", "subagent", "rpc", "sdk"] as const;
+
+function isValidSource(source: string): source is CliSource {
+	return VALID_SOURCES.includes(source as CliSource);
+}
 
 export function isValidThinkingLevel(level: string): level is ThinkingLevel {
 	return VALID_THINKING_LEVELS.includes(level as ThinkingLevel);
@@ -80,6 +89,21 @@ export function parseArgs(args: string[]): Args {
 			if (mode === "text" || mode === "json" || mode === "rpc") {
 				result.mode = mode;
 			}
+		} else if (arg === "--source" && i + 1 < args.length) {
+			const source = args[++i];
+			if (isValidSource(source)) {
+				result.source = source;
+			} else {
+				result.diagnostics.push({
+					type: "error",
+					message: `Invalid source "${source}". Valid values: ${VALID_SOURCES.join(", ")}`,
+				});
+			}
+		} else if (arg === "--agent-identity" && i + 1 < args.length) {
+			result.agentIdentity = args[++i];
+		} else if (arg === "--no-router") {
+			result.disableRouter = true;
+			process.env.PI_ROUTER_DISABLED = "1";
 		} else if (arg === "--continue" || arg === "-c") {
 			result.continue = true;
 		} else if (arg === "--resume" || arg === "-r") {
@@ -241,6 +265,9 @@ ${chalk.bold("Options:")}
   --system-prompt <text>         System prompt (default: coding assistant prompt)
   --append-system-prompt <text>  Append text or file contents to the system prompt (can be used multiple times)
   --mode <mode>                  Output mode: text (default), json, or rpc
+  --source <source>              Invocation source: interactive, print, subagent, rpc, or sdk
+  --agent-identity <name>        Agent identity for subagent/SDK invocations
+  --no-router                    Disable routing extensions for this process
   --print, -p                    Non-interactive mode: process prompt and exit
   --continue, -c                 Continue previous session
   --resume, -r                   Select a session to resume

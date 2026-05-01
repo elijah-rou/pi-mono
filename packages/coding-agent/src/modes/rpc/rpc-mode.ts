@@ -467,12 +467,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 				if (!model) {
 					return error(id, "set_model", `Model not found: ${command.provider}/${command.modelId}`);
 				}
-				await session.setModel(model);
+				await session.setModel(model, { persist: false });
 				return success(id, "set_model", model);
 			}
 
 			case "cycle_model": {
-				const result = await session.cycleModel();
+				const result = await session.cycleModel("forward", { persist: false });
 				if (!result) {
 					return success(id, "cycle_model", null);
 				}
@@ -489,12 +489,12 @@ export async function runRpcMode(runtimeHost: AgentSessionRuntime): Promise<neve
 			// =================================================================
 
 			case "set_thinking_level": {
-				session.setThinkingLevel(command.level);
+				session.setThinkingLevel(command.level, { persist: false });
 				return success(id, "set_thinking_level");
 			}
 
 			case "cycle_thinking_level": {
-				const level = session.cycleThinkingLevel();
+				const level = session.cycleThinkingLevel({ persist: false });
 				if (!level) {
 					return success(id, "cycle_thinking_level", null);
 				}

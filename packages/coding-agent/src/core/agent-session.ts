@@ -63,6 +63,7 @@ import {
 	ExtensionRunner,
 	type ExtensionUIContext,
 	type InputSource,
+	type InvocationKind,
 	type MessageEndEvent,
 	type MessageStartEvent,
 	type MessageUpdateEvent,
@@ -188,6 +189,14 @@ export interface AgentSessionConfig {
 	extensionRunnerRef?: { current?: ExtensionRunner };
 	/** Session start event metadata emitted when extensions bind to this runtime. */
 	sessionStartEvent?: SessionStartEvent;
+	/** How this runtime was invoked. */
+	invocationKind?: InvocationKind;
+	/** Subagent/SDK identity for non-interactive invocations, if provided. */
+	agentIdentity?: string | null;
+	/** Whether --tools was explicitly provided by the CLI. */
+	explicitToolsSet?: boolean;
+	/** Whether --model was explicitly provided by the CLI. */
+	explicitModelSet?: boolean;
 }
 
 export interface ExtensionBindings {
@@ -313,6 +322,10 @@ export class AgentSession {
 	private _excludedToolNames?: Set<string>;
 	private _baseToolsOverride?: Record<string, AgentTool>;
 	private _sessionStartEvent: SessionStartEvent;
+	private _invocationKind: InvocationKind;
+	private _agentIdentity: string | null;
+	private _explicitToolsSet: boolean;
+	private _explicitModelSet: boolean;
 	private _extensionUIContext?: ExtensionUIContext;
 	private _extensionMode: ExtensionMode = "print";
 	private _extensionCommandContextActions?: ExtensionCommandContextActions;
@@ -350,6 +363,10 @@ export class AgentSession {
 		this._excludedToolNames = config.excludedToolNames ? new Set(config.excludedToolNames) : undefined;
 		this._baseToolsOverride = config.baseToolsOverride;
 		this._sessionStartEvent = config.sessionStartEvent ?? { type: "session_start", reason: "startup" };
+		this._invocationKind = config.invocationKind ?? "interactive";
+		this._agentIdentity = config.agentIdentity ?? process.env.PI_AGENT_IDENTITY ?? null;
+		this._explicitToolsSet = config.explicitToolsSet ?? false;
+		this._explicitModelSet = config.explicitModelSet ?? false;
 
 		// Always subscribe to agent events for internal handling
 		// (session persistence, extensions, auto-compaction, retry logic)
@@ -1501,14 +1518,20 @@ export class AgentSession {
 	 * @param direction - "forward" (default) or "backward"
 	 * @returns The new model info, or undefined if only one model available
 	 */
-	async cycleModel(direction: "forward" | "backward" = "forward"): Promise<ModelCycleResult | undefined> {
+	async cycleModel(
+		direction: "forward" | "backward" = "forward",
+		options?: ModelSelectionOptions,
+	): Promise<ModelCycleResult | undefined> {
 		if (this._scopedModels.length > 0) {
-			return this._cycleScopedModel(direction);
+			return this._cycleScopedModel(direction, options);
 		}
-		return this._cycleAvailableModel(direction);
+		return this._cycleAvailableModel(direction, options);
 	}
 
-	private async _cycleScopedModel(direction: "forward" | "backward"): Promise<ModelCycleResult | undefined> {
+	private async _cycleScopedModel(
+		direction: "forward" | "backward",
+		options?: ModelSelectionOptions,
+	): Promise<ModelCycleResult | undefined> {
 		const scopedModels = this._scopedModels.filter((scoped) => this._modelRegistry.hasConfiguredAuth(scoped.model));
 		if (scopedModels.length <= 1) return undefined;
 
@@ -1524,20 +1547,25 @@ export class AgentSession {
 		// Apply model
 		this.agent.state.model = next.model;
 		this.sessionManager.appendModelChange(next.model.provider, next.model.id);
-		this.settingsManager.setDefaultModelAndProvider(next.model.provider, next.model.id);
+		if (options?.persist ?? true) {
+			this.settingsManager.setDefaultModelAndProvider(next.model.provider, next.model.id);
+		}
 
 		// Apply thinking level.
 		// - Explicit scoped model thinking level overrides current session level
 		// - Undefined scoped model thinking level inherits the current session preference
 		// setThinkingLevel clamps to model capabilities.
-		this.setThinkingLevel(thinkingLevel);
+		this.setThinkingLevel(thinkingLevel, options);
 
 		await this._emitModelSelect(next.model, currentModel, "cycle");
 
 		return { model: next.model, thinkingLevel: this.thinkingLevel, isScoped: true };
 	}
 
-	private async _cycleAvailableModel(direction: "forward" | "backward"): Promise<ModelCycleResult | undefined> {
+	private async _cycleAvailableModel(
+		direction: "forward" | "backward",
+		options?: ModelSelectionOptions,
+	): Promise<ModelCycleResult | undefined> {
 		const availableModels = await this._modelRegistry.getAvailable();
 		if (availableModels.length <= 1) return undefined;
 
@@ -1552,10 +1580,12 @@ export class AgentSession {
 		const thinkingLevel = this._getThinkingLevelForModelSwitch();
 		this.agent.state.model = nextModel;
 		this.sessionManager.appendModelChange(nextModel.provider, nextModel.id);
-		this.settingsManager.setDefaultModelAndProvider(nextModel.provider, nextModel.id);
+		if (options?.persist ?? true) {
+			this.settingsManager.setDefaultModelAndProvider(nextModel.provider, nextModel.id);
+		}
 
 		// Re-clamp thinking level for new model's capabilities
-		this.setThinkingLevel(thinkingLevel);
+		this.setThinkingLevel(thinkingLevel, options);
 
 		await this._emitModelSelect(nextModel, currentModel, "cycle");
 
@@ -1600,7 +1630,7 @@ export class AgentSession {
 	 * Cycle to next thinking level.
 	 * @returns New level, or undefined if model doesn't support thinking
 	 */
-	cycleThinkingLevel(): ThinkingLevel | undefined {
+	cycleThinkingLevel(options?: ModelSelectionOptions): ThinkingLevel | undefined {
 		if (!this.supportsThinking()) return undefined;
 
 		const levels = this.getAvailableThinkingLevels();
@@ -1608,7 +1638,7 @@ export class AgentSession {
 		const nextIndex = (currentIndex + 1) % levels.length;
 		const nextLevel = levels[nextIndex];
 
-		this.setThinkingLevel(nextLevel);
+		this.setThinkingLevel(nextLevel, options);
 		return nextLevel;
 	}
 
@@ -2465,6 +2495,12 @@ export class AgentSession {
 			this._cwd,
 			this.sessionManager,
 			this._modelRegistry,
+			{
+				invocationKind: this._invocationKind,
+				agentIdentity: this._agentIdentity,
+				explicitToolsSet: this._explicitToolsSet,
+				explicitModelSet: this._explicitModelSet,
+			},
 		);
 		if (this._extensionRunnerRef) {
 			this._extensionRunnerRef.current = this._extensionRunner;

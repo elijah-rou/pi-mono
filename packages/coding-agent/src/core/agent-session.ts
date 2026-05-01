@@ -26,7 +26,6 @@ import type {
 import type { AssistantMessage, ImageContent, Message, Model, TextContent } from "@earendil-works/pi-ai";
 import {
 	clampThinkingLevel,
-	cleanupSessionResources,
 	getSupportedThinkingLevels,
 	isContextOverflow,
 	modelsAreEqual,

@@ -42,7 +42,7 @@ import {
 import { formatNoModelsAvailableMessage } from "./core/auth-guidance.ts";
 import { AuthStorage, ReadOnlyAuthStorage } from "./core/auth-storage.ts";
 import { exportFromFile } from "./core/export-html/index.ts";
-import type { InlineExtension } from "./core/extensions/types.ts";
+import type { InlineExtension, InvocationKind } from "./core/extensions/types.ts";
 import { applyHttpProxySettings, configureHttpDispatcher } from "./core/http-dispatcher.ts";
 import { resolveCliModel, resolveModelScope, type ScopedModel } from "./core/model-resolver.ts";
 import { ModelRuntime } from "./core/model-runtime.ts";
@@ -212,6 +212,19 @@ async function runAuthCommand(args: string[]): Promise<boolean> {
 		process.exitCode = command.kind === "check" ? 2 : 1;
 	}
 	return true;
+}
+
+function isInvocationKind(value: string | undefined): value is InvocationKind {
+	return value === "interactive" || value === "print" || value === "subagent" || value === "rpc" || value === "sdk";
+}
+
+export function resolveInvocationKind(parsed: Args, appMode: AppMode): InvocationKind {
+	if (parsed.source) return parsed.source;
+	if (isInvocationKind(process.env.PI_INVOCATION_KIND)) return process.env.PI_INVOCATION_KIND;
+	if (process.env.PI_AGENT_IDENTITY) return "subagent";
+	if (appMode === "rpc") return "rpc";
+	if (appMode === "print" || appMode === "json") return "print";
+	return "interactive";
 }
 
 async function prepareInitialMessage(
@@ -616,6 +629,12 @@ export async function main(args: string[], options?: MainOptions) {
 			process.exit(1);
 		}
 	}
+	if (parsed.disableRouter) {
+		process.env.PI_ROUTER_DISABLED = "1";
+	}
+	if (parsed.agentIdentity) {
+		process.env.PI_AGENT_IDENTITY = parsed.agentIdentity;
+	}
 	time("parseArgs");
 
 	if (parsed.version) {
@@ -638,6 +657,9 @@ export async function main(args: string[], options?: MainOptions) {
 	}
 
 	let appMode = resolveAppMode(parsed, process.stdin.isTTY, process.stdout.isTTY);
+	const invocationKind = resolveInvocationKind(parsed, appMode);
+	process.env.PI_INVOCATION_KIND = invocationKind;
+	const agentIdentity = parsed.agentIdentity ?? process.env.PI_AGENT_IDENTITY ?? null;
 	const shouldTakeOverStdout = appMode !== "interactive" && !isPlainRuntimeMetadataCommand(parsed);
 	if (shouldTakeOverStdout) {
 		takeOverStdout();
@@ -820,6 +842,10 @@ export async function main(args: string[], options?: MainOptions) {
 			services,
 			sessionManager,
 			sessionStartEvent,
+			invocationKind,
+			agentIdentity,
+			explicitToolsSet: parsed.tools !== undefined,
+			explicitModelSet: parsed.model !== undefined,
 			model: sessionOptions.model,
 			thinkingLevel: sessionOptions.thinkingLevel,
 			scopedModels: sessionOptions.scopedModels,
@@ -830,7 +856,10 @@ export async function main(args: string[], options?: MainOptions) {
 		});
 		const cliThinkingOverride = parsed.thinking !== undefined || cliThinkingFromModel;
 		if (created.session.model && cliThinkingOverride) {
-			created.session.setThinkingLevel(created.session.thinkingLevel);
+			const effectiveThinking = clampThinkingLevel(created.session.model, created.session.thinkingLevel);
+			if (effectiveThinking !== created.session.thinkingLevel) {
+				created.session.setThinkingLevel(effectiveThinking, { persist: false });
+			}
 		}
 
 		return {
@@ -889,6 +918,7 @@ export async function main(args: string[], options?: MainOptions) {
 		await showDeprecationWarnings(deprecationWarnings);
 	}
 
+	const scopedModels = [...session.scopedModels];
 	time("resolveModelScope");
 	reportDiagnostics(runtime.diagnostics);
 	if (runtime.diagnostics.some((diagnostic) => diagnostic.type === "error")) {
@@ -924,6 +954,16 @@ export async function main(args: string[], options?: MainOptions) {
 		printTimings();
 		await runRpcMode(runtime);
 	} else if (appMode === "interactive") {
+		if (scopedModels.length > 0 && (parsed.verbose || !settingsManager.getQuietStartup())) {
+			const modelList = scopedModels
+				.map((sm) => {
+					const thinkingStr = sm.thinkingLevel ? `:${sm.thinkingLevel}` : "";
+					return `${sm.model.id}${thinkingStr}`;
+				})
+				.join(", ");
+			console.log(chalk.dim(`Model scope: ${modelList} ${chalk.gray("(Ctrl+P to cycle)")}`));
+		}
+
 		const interactiveMode = new InteractiveMode(runtime, {
 			migratedProviders,
 			modelFallbackMessage,
@@ -961,6 +1001,7 @@ export async function main(args: string[], options?: MainOptions) {
 			messages: parsed.messages,
 			initialMessage,
 			initialImages,
+			invocationKind,
 		});
 		stopThemeWatcher();
 		restoreStdout();

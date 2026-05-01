@@ -38,6 +38,7 @@ import type {
 	InputEvent,
 	InputEventResult,
 	InputSource,
+	InvocationKind,
 	LoadExtensionsResult,
 	MarkdownTransformer,
 	MessageEndEvent,
@@ -271,6 +272,10 @@ export class ExtensionRunner {
 	private uiContext: ExtensionUIContext;
 	private mode: ExtensionMode = "print";
 	private cwd: string;
+	private invocationKind: InvocationKind;
+	private agentIdentity: string | null;
+	private explicitToolsSet: boolean;
+	private explicitModelSet: boolean;
 	private sessionManager: SessionManager;
 	private modelRegistry: ModelRegistry;
 	private errorListeners: Set<ExtensionErrorListener> = new Set();
@@ -302,11 +307,21 @@ export class ExtensionRunner {
 		cwd: string,
 		sessionManager: SessionManager,
 		modelRegistry: ModelRegistry,
+		options?: {
+			invocationKind?: InvocationKind;
+			agentIdentity?: string | null;
+			explicitToolsSet?: boolean;
+			explicitModelSet?: boolean;
+		},
 	) {
 		this.extensions = extensions;
 		this.runtime = runtime;
 		this.uiContext = noOpUIContext;
 		this.cwd = cwd;
+		this.invocationKind = options?.invocationKind ?? "interactive";
+		this.agentIdentity = options?.agentIdentity ?? process.env.PI_AGENT_IDENTITY ?? null;
+		this.explicitToolsSet = options?.explicitToolsSet ?? false;
+		this.explicitModelSet = options?.explicitModelSet ?? false;
 		this.sessionManager = sessionManager;
 		this.modelRegistry = modelRegistry;
 	}
@@ -690,6 +705,22 @@ export class ExtensionRunner {
 			get cwd() {
 				runner.assertActive();
 				return runner.cwd;
+			},
+			get invocationKind() {
+				runner.assertActive();
+				return runner.invocationKind;
+			},
+			get agentIdentity() {
+				runner.assertActive();
+				return runner.agentIdentity;
+			},
+			get explicitToolsSet() {
+				runner.assertActive();
+				return runner.explicitToolsSet;
+			},
+			get explicitModelSet() {
+				runner.assertActive();
+				return runner.explicitModelSet;
 			},
 			get sessionManager() {
 				runner.assertActive();

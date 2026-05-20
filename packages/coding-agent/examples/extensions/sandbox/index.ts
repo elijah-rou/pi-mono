@@ -44,47 +44,12 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { SandboxManager, type SandboxRuntimeConfig } from "@anthropic-ai/sandbox-runtime";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { type BashOperations, createBashTool, getAgentDir } from "@earendil-works/pi-coding-agent";
 
-interface SandboxRuntimeConfig {
-	network?: {
-		allowedDomains?: string[];
-		deniedDomains?: string[];
-	};
-	filesystem?: {
-		denyRead?: string[];
-		allowWrite?: string[];
-		denyWrite?: string[];
-	};
-	ignoreViolations?: Record<string, string[]>;
-	enableWeakerNestedSandbox?: boolean;
-}
-
-interface SandboxManagerAPI {
-	initialize(config: SandboxRuntimeConfig): Promise<void>;
-	wrapWithSandbox(command: string): Promise<string>;
-	reset(): Promise<void>;
-}
-
 interface SandboxConfig extends SandboxRuntimeConfig {
 	enabled?: boolean;
-}
-
-let sandboxManagerPromise: Promise<SandboxManagerAPI> | undefined;
-
-function getSandboxManager(): Promise<SandboxManagerAPI> {
-	sandboxManagerPromise ??= (async () => {
-		const dynamicImport = new Function("specifier", "return import(specifier)") as (
-			specifier: string,
-		) => Promise<{ SandboxManager?: SandboxManagerAPI }>;
-		const mod = await dynamicImport("@anthropic-ai/sandbox-runtime");
-		if (!mod.SandboxManager) {
-			throw new Error("@anthropic-ai/sandbox-runtime did not export SandboxManager");
-		}
-		return mod.SandboxManager;
-	})();
-	return sandboxManagerPromise;
 }
 
 const DEFAULT_CONFIG: SandboxConfig = {
@@ -171,8 +136,7 @@ function createSandboxedBashOps(): BashOperations {
 				throw new Error(`Working directory does not exist: ${cwd}`);
 			}
 
-			const sandboxManager = await getSandboxManager();
-			const wrappedCommand = await sandboxManager.wrapWithSandbox(command);
+			const wrappedCommand = await SandboxManager.wrapWithSandbox(command);
 
 			return new Promise((resolve, reject) => {
 				const child = spawn("bash", ["-c", wrappedCommand], {
@@ -297,8 +261,7 @@ export default function (pi: ExtensionAPI) {
 				enableWeakerNestedSandbox?: boolean;
 			};
 
-			const sandboxManager = await getSandboxManager();
-			await sandboxManager.initialize({
+			await SandboxManager.initialize({
 				network: config.network,
 				filesystem: config.filesystem,
 				ignoreViolations: configExt.ignoreViolations,
@@ -324,8 +287,7 @@ export default function (pi: ExtensionAPI) {
 	pi.on("session_shutdown", async () => {
 		if (sandboxInitialized) {
 			try {
-				const sandboxManager = await getSandboxManager();
-				await sandboxManager.reset();
+				await SandboxManager.reset();
 			} catch {
 				// Ignore cleanup errors
 			}

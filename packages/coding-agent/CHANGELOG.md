@@ -327,10 +327,6 @@
 
 - Fixed packaged `pi` startup failing because the session selector imported a source-only utility path.
 
-### Added
-
-- Added non-persistent extension model and thinking-level selection via `pi.setModel(model, { persist: false })` and `pi.setThinkingLevel(level, { persist: false })` for per-session routing without mutating `settings.json`.
-
 ## [0.70.3] - 2026-04-27
 
 ### New Features

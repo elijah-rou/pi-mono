@@ -465,9 +465,6 @@ export async function main(args: string[], options?: MainOptions) {
 			process.exit(1);
 		}
 	}
-	if (parsed.disableRouter) {
-		process.env.PI_ROUTER_DISABLED = "1";
-	}
 	if (parsed.agentIdentity) {
 		process.env.PI_AGENT_IDENTITY = parsed.agentIdentity;
 	}

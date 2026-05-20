@@ -24,7 +24,6 @@ export interface Args {
 	mode?: Mode;
 	source?: CliSource;
 	agentIdentity?: string;
-	disableRouter?: boolean;
 	noSession?: boolean;
 	session?: string;
 	fork?: string;
@@ -97,9 +96,6 @@ export function parseArgs(args: string[]): Args {
 			}
 		} else if (arg === "--agent-identity" && i + 1 < args.length) {
 			result.agentIdentity = args[++i];
-		} else if (arg === "--no-router") {
-			result.disableRouter = true;
-			process.env.PI_ROUTER_DISABLED = "1";
 		} else if (arg === "--continue" || arg === "-c") {
 			result.continue = true;
 		} else if (arg === "--resume" || arg === "-r") {
@@ -246,7 +242,6 @@ ${chalk.bold("Options:")}
   --mode <mode>                  Output mode: text (default), json, or rpc
   --source <source>              Invocation source: interactive, print, subagent, rpc, or sdk
   --agent-identity <name>        Agent identity for subagent/SDK invocations
-  --no-router                    Disable routing extensions for this process
   --print, -p                    Non-interactive mode: process prompt and exit
   --continue, -c                 Continue previous session
   --resume, -r                   Select a session to resume

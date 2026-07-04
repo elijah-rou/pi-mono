@@ -233,6 +233,16 @@ export function parseArgs(args: string[]): Args {
 	return result;
 }
 
+/** True when the CLI explicitly constrained tool selection via any tool-affecting flag. */
+export function hasExplicitToolSelection(args: Args): boolean {
+	return (
+		args.tools !== undefined ||
+		args.noTools === true ||
+		args.noBuiltinTools === true ||
+		args.excludeTools !== undefined
+	);
+}
+
 export function printHelp(extensionFlags?: ExtensionFlag[]): void {
 	const extensionFlagsText =
 		extensionFlags && extensionFlags.length > 0

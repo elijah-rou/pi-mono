@@ -383,6 +383,17 @@ describe("parseArgs", () => {
 		});
 	});
 
+	describe("hasExplicitToolSelection", () => {
+		test("returns true for --tools, --no-tools, --no-builtin-tools, and --exclude-tools", async () => {
+			const { hasExplicitToolSelection } = await import("../src/cli/args.ts");
+			expect(hasExplicitToolSelection(parseArgs(["--tools", "read"]))).toBe(true);
+			expect(hasExplicitToolSelection(parseArgs(["--no-tools"]))).toBe(true);
+			expect(hasExplicitToolSelection(parseArgs(["--no-builtin-tools"]))).toBe(true);
+			expect(hasExplicitToolSelection(parseArgs(["--exclude-tools", "bash"]))).toBe(true);
+			expect(hasExplicitToolSelection(parseArgs([]))).toBe(false);
+		});
+	});
+
 	describe("messages and file args", () => {
 		test("parses plain text messages", () => {
 			const result = parseArgs(["hello", "world"]);

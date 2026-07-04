@@ -8,7 +8,7 @@
 import { createInterface } from "node:readline";
 import { clampThinkingLevel, type ImageContent, modelsAreEqual } from "@earendil-works/pi-ai";
 import chalk from "chalk";
-import { type Args, type Mode, parseArgs, printHelp } from "./cli/args.ts";
+import { type Args, hasExplicitToolSelection, type Mode, parseArgs, printHelp } from "./cli/args.ts";
 import {
 	type AuthCheckResult,
 	checkProviderAuth,
@@ -844,7 +844,7 @@ export async function main(args: string[], options?: MainOptions) {
 			sessionStartEvent,
 			invocationKind,
 			agentIdentity,
-			explicitToolsSet: parsed.tools !== undefined,
+			explicitToolsSet: hasExplicitToolSelection(parsed),
 			explicitModelSet: parsed.model !== undefined,
 			model: sessionOptions.model,
 			thinkingLevel: sessionOptions.thinkingLevel,

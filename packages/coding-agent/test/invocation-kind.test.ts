@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "vitest";
-import { parseArgs } from "../src/cli/args.js";
-import { resolveInvocationKind } from "../src/main.js";
+import { parseArgs } from "../src/cli/args.ts";
+import { resolveInvocationKind } from "../src/main.ts";
 
 const originalInvocationKind = process.env.PI_INVOCATION_KIND;
 const originalAgentIdentity = process.env.PI_AGENT_IDENTITY;
